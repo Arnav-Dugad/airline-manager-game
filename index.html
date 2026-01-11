@@ -1,0 +1,1340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Airline Tycoon — One-File Simulation</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:rgba(255,255,255,.06);
+      --panel2:rgba(255,255,255,.09);
+      --stroke:rgba(255,255,255,.12);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.65);
+      --muted2:rgba(255,255,255,.45);
+      --good:#39d98a;
+      --warn:#ffcc66;
+      --bad:#ff6b6b;
+      --accent:#7c5cff;
+      --accent2:#41d1ff;
+      --shadow:0 18px 60px rgba(0,0,0,.55);
+      --radius:18px;
+      --radius2:12px;
+      --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,"Liberation Mono","Courier New",monospace;
+      --sans: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Arial,"Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(1000px 800px at 20% 10%, rgba(124,92,255,.25), transparent 55%),
+        radial-gradient(900px 700px at 80% 20%, rgba(65,209,255,.18), transparent 55%),
+        radial-gradient(900px 700px at 50% 90%, rgba(57,217,138,.12), transparent 60%),
+        linear-gradient(180deg, #060916, #0b1020 35%, #070a14);
+      overflow:hidden;
+    }
+    .app{
+      height:100%;
+      display:grid;
+      grid-template-columns: 320px 1fr 360px;
+      gap:14px;
+      padding:14px;
+    }
+    .card{
+      background:var(--panel);
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(12px);
+      overflow:hidden;
+    }
+    .cardHeader{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 14px;
+      border-bottom:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+    }
+    .titleRow{
+      display:flex; gap:10px; align-items:center; min-width:0;
+    }
+    .logo{
+      width:34px;height:34px;border-radius:12px;
+      background:conic-gradient(from 210deg, var(--accent), var(--accent2), var(--good), var(--accent));
+      box-shadow: 0 8px 28px rgba(124,92,255,.35);
+      border:1px solid rgba(255,255,255,.25);
+    }
+    .h1{
+      font-weight:800; letter-spacing:.2px;
+      font-size:14px;
+      line-height:1.1;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .sub{
+      font-size:12px; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .badge{
+      font-size:12px; padding:6px 10px; border-radius:999px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      color:var(--muted);
+      display:flex; gap:8px; align-items:center;
+    }
+    .dot{width:8px;height:8px;border-radius:99px;background:var(--good); box-shadow: 0 0 0 3px rgba(57,217,138,.15)}
+    .col{display:flex; flex-direction:column; min-height:0;}
+    .scroll{overflow:auto; scrollbar-width:thin; scrollbar-color: rgba(255,255,255,.2) transparent;}
+    .scroll::-webkit-scrollbar{width:10px;height:10px}
+    .scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15); border-radius:10px; border:2px solid transparent; background-clip:content-box}
+    .scroll::-webkit-scrollbar-track{background:transparent}
+
+    /* Left panel */
+    .side{
+      display:flex; flex-direction:column; min-height:0;
+    }
+    .side .content{padding:12px 12px 14px}
+    .kv{
+      display:grid; grid-template-columns: 1fr auto;
+      gap:8px 10px; padding:10px 10px;
+      border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.04);
+    }
+    .k{font-size:12px;color:var(--muted)}
+    .v{font-family:var(--mono); font-size:12px;color:rgba(255,255,255,.85)}
+    .v.good{color:var(--good)}
+    .v.warn{color:var(--warn)}
+    .v.bad{color:var(--bad)}
+    .btnRow{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+    button, .btn{
+      appearance:none; border:none;
+      border-radius: 14px;
+      padding:10px 11px;
+      background:rgba(255,255,255,.06);
+      border:1px solid var(--stroke);
+      color:var(--text);
+      cursor:pointer;
+      transition:.15s transform, .15s background, .15s border-color;
+      font-weight:650;
+      font-size:12px;
+      display:inline-flex; align-items:center; gap:8px;
+      user-select:none;
+    }
+    button:hover{transform: translateY(-1px); background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18)}
+    button:active{transform: translateY(0px) scale(.99)}
+    .primary{
+      background: linear-gradient(180deg, rgba(124,92,255,.92), rgba(124,92,255,.72));
+      border-color: rgba(255,255,255,.22);
+      box-shadow: 0 14px 35px rgba(124,92,255,.25);
+    }
+    .primary:hover{background: linear-gradient(180deg, rgba(124,92,255,.98), rgba(124,92,255,.78))}
+    .danger{
+      background: linear-gradient(180deg, rgba(255,107,107,.95), rgba(255,107,107,.7));
+      border-color: rgba(255,255,255,.2);
+      box-shadow: 0 14px 35px rgba(255,107,107,.18);
+    }
+    .ghost{background:transparent}
+    .small{padding:7px 9px; border-radius:12px; font-size:12px}
+    .pill{
+      font-family:var(--mono);
+      font-size:11px;
+      color:rgba(255,255,255,.78);
+      padding:6px 9px;border-radius:999px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.05);
+      display:inline-flex; gap:6px; align-items:center;
+    }
+    .sep{height:1px;background:var(--stroke); margin:10px 0}
+    .hint{font-size:12px;color:var(--muted); line-height:1.45}
+    .warnBox{
+      margin-top:10px;
+      padding:10px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,204,102,.25);
+      background:rgba(255,204,102,.08);
+      color:rgba(255,255,255,.85);
+    }
+    .warnBox b{color:var(--warn)}
+    .miniList{display:flex; flex-direction:column; gap:8px; margin-top:10px}
+    .miniItem{
+      padding:10px 10px; border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.04);
+    }
+    .miniItem .t{font-weight:750; font-size:12px}
+    .miniItem .d{margin-top:6px; color:var(--muted); font-size:12px; line-height:1.35}
+
+    /* Center panel */
+    .main{
+      display:flex; flex-direction:column; min-height:0;
+    }
+    .tabs{
+      display:flex; gap:8px; flex-wrap:wrap;
+      padding:10px 12px;
+    }
+    .tab{
+      padding:9px 10px;
+      border-radius:999px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.05);
+      color:rgba(255,255,255,.82);
+      font-size:12px;
+      cursor:pointer;
+      user-select:none;
+      transition:.15s transform,.15s background,.15s border-color;
+      display:inline-flex; align-items:center; gap:8px;
+    }
+    .tab:hover{transform: translateY(-1px); background:rgba(255,255,255,.07)}
+    .tab.active{
+      background: linear-gradient(180deg, rgba(65,209,255,.25), rgba(124,92,255,.20));
+      border-color: rgba(255,255,255,.20);
+      box-shadow: 0 14px 35px rgba(65,209,255,.12);
+    }
+    .tab .ico{
+      width:18px;height:18px;border-radius:6px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12);
+      display:grid; place-items:center;
+      font-size:12px;
+    }
+    .mainBody{
+      padding:0 12px 12px;
+      display:flex; flex-direction:column;
+      min-height:0;
+      gap:12px;
+    }
+    .grid2{
+      display:grid; grid-template-columns: 1fr 1fr; gap:12px;
+    }
+    .grid3{
+      display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;
+    }
+    .panel{
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.04);
+      border-radius: var(--radius);
+      overflow:hidden;
+      min-height:0;
+    }
+    .panelHead{
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 12px;
+      border-bottom:1px solid var(--stroke);
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+    }
+    .panelHead .h{
+      font-weight:800; font-size:12px; letter-spacing:.2px;
+    }
+    .panelHead .r{display:flex; gap:8px; align-items:center}
+    .panelBody{padding:12px; min-height:0}
+    .row{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    label{font-size:12px; color:var(--muted)}
+    input, select, textarea{
+      width:100%;
+      padding:10px 10px;
+      border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(0,0,0,.20);
+      color:var(--text);
+      outline:none;
+      font-size:12px;
+    }
+    input:focus, select:focus, textarea:focus{border-color: rgba(65,209,255,.35); box-shadow: 0 0 0 3px rgba(65,209,255,.10)}
+    textarea{min-height:72px; resize:vertical}
+    .field{display:flex; flex-direction:column; gap:7px; min-width:180px; flex:1}
+    .field.s{min-width:120px; flex:0.6}
+    .field.xs{min-width:90px; flex:0.4}
+    .field.l{min-width:240px; flex:1.4}
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:12px;
+    }
+    th, td{
+      text-align:left;
+      padding:10px 9px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      vertical-align:top;
+    }
+    th{color:rgba(255,255,255,.72); font-weight:800; font-size:11px; letter-spacing:.3px; text-transform:uppercase}
+    tr:hover td{background:rgba(255,255,255,.03)}
+    .right{ text-align:right }
+    .center{ text-align:center }
+    .muted{ color: var(--muted) }
+    .tiny{font-size:11px;color:var(--muted2)}
+    .good{ color: var(--good) }
+    .warn{ color: var(--warn) }
+    .bad{ color: var(--bad) }
+    .bar{
+      height:10px; border-radius:999px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12);
+      overflow:hidden;
+    }
+    .bar > i{
+      display:block; height:100%;
+      width:50%;
+      background: linear-gradient(90deg, rgba(57,217,138,.95), rgba(65,209,255,.80));
+      border-right: 1px solid rgba(255,255,255,.18);
+    }
+    .spark{
+      height:62px;
+      width:100%;
+      display:block;
+      background:rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:14px;
+    }
+
+    /* Right panel */
+    .rightCol .content{padding:12px 12px 14px}
+    .log{
+      display:flex; flex-direction:column; gap:8px;
+      padding:10px;
+      min-height:0;
+    }
+    .logItem{
+      padding:10px 10px; border-radius:14px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.04);
+    }
+    .logItem .top{display:flex; justify-content:space-between; gap:10px; align-items:center}
+    .logItem .msg{margin-top:7px; font-size:12px; color:rgba(255,255,255,.86); line-height:1.35}
+    .logItem .meta{font-family:var(--mono); font-size:11px; color:var(--muted)}
+    .tag{
+      font-size:11px;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,.06);
+      color:rgba(255,255,255,.8);
+      white-space:nowrap;
+    }
+    .tag.good{border-color:rgba(57,217,138,.25); background:rgba(57,217,138,.10)}
+    .tag.warn{border-color:rgba(255,204,102,.25); background:rgba(255,204,102,.10)}
+    .tag.bad{border-color:rgba(255,107,107,.25); background:rgba(255,107,107,.10)}
+
+    .modalWrap{
+      position:fixed; inset:0;
+      display:none;
+      align-items:center; justify-content:center;
+      padding:16px;
+      background:rgba(0,0,0,.55);
+      backdrop-filter: blur(8px);
+      z-index:50;
+    }
+    .modal{
+      width:min(980px, 100%);
+      max-height: min(86vh, 860px);
+      display:flex; flex-direction:column;
+    }
+    .modal .body{padding:12px; min-height:0}
+    .modal .body .scroll{max-height:calc(86vh - 120px)}
+    .kbd{font-family:var(--mono); font-size:11px; padding:3px 6px; border-radius:8px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); color:rgba(255,255,255,.85)}
+    .twoCol{display:grid; grid-template-columns: 1fr 1fr; gap:12px}
+    .mono{font-family:var(--mono)}
+    .nowrap{white-space:nowrap}
+    .chip{
+      display:inline-flex; gap:6px; align-items:center;
+      padding:6px 9px; border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid var(--stroke);
+      color:rgba(255,255,255,.82);
+      font-size:12px;
+    }
+    .chip b{font-family:var(--mono); font-weight:800}
+    @media (max-width: 1120px){
+      body{overflow:auto}
+      .app{grid-template-columns: 1fr; overflow:auto}
+    }
+  </style>
+</head>
+
+<body>
+<div class="app">
+  <!-- LEFT: Company / Controls -->
+  <section class="card side col">
+    <div class="cardHeader">
+      <div class="titleRow">
+        <div class="logo"></div>
+        <div style="min-width:0">
+          <div class="h1" id="companyName">Aurora Air</div>
+          <div class="sub" id="companySub">Build a profitable network, survive shocks, grow reputation.</div>
+        </div>
+      </div>
+      <div class="badge"><span class="dot" id="simDot"></span><span id="simState">PAUSED</span></div>
+    </div>
+
+    <div class="content scroll">
+      <div class="kv" id="kvBox"></div>
+
+      <div class="btnRow">
+        <button class="primary" id="btnPlay">▶ Simulate 1 day</button>
+        <button id="btnPlay7">⏩ 7 days</button>
+        <button id="btnAuto">⏱ Auto</button>
+        <button id="btnPause" class="ghost">⏸ Pause</button>
+      </div>
+
+      <div class="btnRow" style="margin-top:8px">
+        <button id="btnNew" class="danger">⟲ New game</button>
+        <button id="btnSave">💾 Save</button>
+        <button id="btnLoad">📂 Load</button>
+        <button id="btnExport">⤓ Export</button>
+        <button id="btnImport">⤒ Import</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="hint">
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <span class="pill">Tips: keep <b class="good">Load Factor</b> high, watch <b class="warn">Fuel</b> and <b class="bad">Condition</b>.</span>
+          <span class="pill">Hotkeys: <span class="kbd">Space</span> day, <span class="kbd">A</span> auto, <span class="kbd">P</span> pause</span>
+        </div>
+      </div>
+
+      <div class="warnBox" id="alertBox" style="display:none"></div>
+
+      <div class="miniList">
+        <div class="miniItem">
+          <div class="t">Today’s Headlines</div>
+          <div class="d" id="headline">No major disruptions. Markets steady.</div>
+        </div>
+        <div class="miniItem">
+          <div class="t">Next Maintenance Risk</div>
+          <div class="d" id="maintHint">Your fleet is healthy. Keep an eye on older aircraft.</div>
+        </div>
+      </div>
+
+      <div class="sep"></div>
+      <div class="hint">
+        This game is intentionally “tycoon-ish”: it’s complex enough to be fun, but still fast.
+        If you want **even more depth** (alliances, airports slots, multi-hub strategy, competitors),
+        tell me and I’ll extend it.
+      </div>
+    </div>
+  </section>
+
+  <!-- CENTER: Tabs / Main -->
+  <section class="card main col">
+    <div class="cardHeader">
+      <div class="titleRow">
+        <div style="min-width:0">
+          <div class="h1">Operations Console</div>
+          <div class="sub">Plan routes • Manage fleet • Finances • Research • Reputation</div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="chip">Day <b id="dayNum">1</b></span>
+        <span class="chip">Cash <b id="cashTop">$0</b></span>
+        <span class="chip">Reputation <b id="repTop">50</b></span>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="mainBody scroll" id="mainBody"></div>
+  </section>
+
+  <!-- RIGHT: Log / Advisor -->
+  <section class="card rightCol col">
+    <div class="cardHeader">
+      <div class="titleRow">
+        <div style="min-width:0">
+          <div class="h1">Advisor & Event Log</div>
+          <div class="sub">What happened, why, and what to do next.</div>
+        </div>
+      </div>
+      <button class="small" id="btnHelp">❓ Help</button>
+    </div>
+    <div class="content col" style="min-height:0">
+      <div class="log scroll" id="log"></div>
+    </div>
+  </section>
+</div>
+
+<!-- MODAL -->
+<div class="modalWrap" id="modalWrap">
+  <div class="card modal col">
+    <div class="cardHeader">
+      <div class="titleRow">
+        <div style="min-width:0">
+          <div class="h1" id="modalTitle">Modal</div>
+          <div class="sub" id="modalSub">—</div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="small" id="modalClose">✕ Close</button>
+      </div>
+    </div>
+    <div class="body col">
+      <div class="scroll" id="modalBody"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  /**********************
+   * Utilities
+   **********************/
+  const $ = (sel, el=document) => el.querySelector(sel);
+  const $$ = (sel, el=document) => [...el.querySelectorAll(sel)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const rnd = (a=1,b=0)=>Math.random()*(a-b)+b;
+  const rndi = (a,b)=>Math.floor(rnd(b+1,a));
+  const pick = (arr)=>arr[Math.floor(Math.random()*arr.length)];
+  const nowISO = ()=> new Date().toISOString();
+  const fmtMoney = (n) => {
+    const sign = n<0 ? "-" : "";
+    n = Math.abs(n);
+    if (n >= 1e9) return `${sign}$${(n/1e9).toFixed(2)}B`;
+    if (n >= 1e6) return `${sign}$${(n/1e6).toFixed(2)}M`;
+    if (n >= 1e3) return `${sign}$${(n/1e3).toFixed(1)}k`;
+    return `${sign}$${n.toFixed(0)}`;
+  };
+  const fmt = (n, d=0)=> Number.isFinite(n) ? n.toFixed(d) : "—";
+  const pct = (x, d=0)=> (x*100).toFixed(d)+"%";
+  const uid = ()=> Math.random().toString(16).slice(2)+Math.random().toString(16).slice(2);
+  const deepCopy = (o)=> JSON.parse(JSON.stringify(o));
+
+  // Haversine distance km
+  function distKm(a,b){
+    const R=6371;
+    const toRad = d=>d*Math.PI/180;
+    const dLat=toRad(b.lat-a.lat);
+    const dLon=toRad(b.lon-a.lon);
+    const la1=toRad(a.lat), la2=toRad(b.lat);
+    const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(h));
+  }
+
+  // Tiny sparkline painter
+  function drawSpark(canvas, values){
+    const ctx=canvas.getContext("2d");
+    const w=canvas.width=canvas.clientWidth*devicePixelRatio;
+    const h=canvas.height=canvas.clientHeight*devicePixelRatio;
+    ctx.clearRect(0,0,w,h);
+    if(!values || values.length<2) return;
+    const pad=10*devicePixelRatio;
+    let min=Infinity,max=-Infinity;
+    for(const v of values){ if(v<min)min=v; if(v>max)max=v; }
+    if(min===max){ min-=1; max+=1; }
+    const xStep=(w-2*pad)/(values.length-1);
+    const yOf=(v)=> h-pad - ( (v-min)/(max-min) )*(h-2*pad);
+
+    // subtle grid
+    ctx.globalAlpha=.25;
+    ctx.strokeStyle="rgba(255,255,255,.18)";
+    ctx.lineWidth=1*devicePixelRatio;
+    for(let i=1;i<=3;i++){
+      const y = pad + i*(h-2*pad)/4;
+      ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(w-pad,y); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+
+    // line
+    const grad = ctx.createLinearGradient(0,0,w,0);
+    grad.addColorStop(0,"rgba(65,209,255,.9)");
+    grad.addColorStop(1,"rgba(124,92,255,.9)");
+    ctx.strokeStyle=grad;
+    ctx.lineWidth=2.5*devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(pad, yOf(values[0]));
+    for(let i=1;i<values.length;i++){
+      ctx.lineTo(pad + i*xStep, yOf(values[i]));
+    }
+    ctx.stroke();
+
+    // fill
+    ctx.globalAlpha=.18;
+    ctx.fillStyle=grad;
+    ctx.lineTo(w-pad, h-pad);
+    ctx.lineTo(pad, h-pad);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  /**********************
+   * Content data
+   **********************/
+  const AIRPORTS = [
+    // id, name, country, lat, lon, pop, tourism, feesIndex, slotPressure
+    {id:"RUH", name:"Riyadh", country:"Saudi", lat:24.7136, lon:46.6753, pop:7.7, tourism:0.55, fees:1.08, slots:0.70},
+    {id:"JED", name:"Jeddah", country:"Saudi", lat:21.4858, lon:39.1925, pop:4.8, tourism:0.68, fees:1.05, slots:0.65},
+    {id:"DMM", name:"Dammam", country:"Saudi", lat:26.4207, lon:50.0888, pop:2.3, tourism:0.45, fees:0.98, slots:0.55},
+    {id:"BAH", name:"Bahrain", country:"Bahrain", lat:26.2708, lon:50.6336, pop:1.7, tourism:0.60, fees:1.00, slots:0.60},
+    {id:"DXB", name:"Dubai", country:"UAE", lat:25.2532, lon:55.3657, pop:3.6, tourism:0.82, fees:1.25, slots:0.88},
+    {id:"AUH", name:"Abu Dhabi", country:"UAE", lat:24.4539, lon:54.3773, pop:1.6, tourism:0.70, fees:1.18, slots:0.72},
+    {id:"DOH", name:"Doha", country:"Qatar", lat:25.2736, lon:51.6081, pop:2.7, tourism:0.63, fees:1.15, slots:0.76},
+    {id:"KWI", name:"Kuwait City", country:"Kuwait", lat:29.3759, lon:47.9774, pop:4.4, tourism:0.40, fees:1.00, slots:0.62},
+    {id:"MCT", name:"Muscat", country:"Oman", lat:23.5880, lon:58.3829, pop:1.7, tourism:0.66, fees:0.92, slots:0.52},
+    {id:"BOM", name:"Mumbai", country:"India", lat:19.0896, lon:72.8656, pop:20.9, tourism:0.58, fees:0.92, slots:0.92},
+    {id:"DEL", name:"Delhi", country:"India", lat:28.5562, lon:77.1000, pop:32.0, tourism:0.55, fees:0.95, slots:0.90},
+    {id:"BLR", name:"Bengaluru", country:"India", lat:13.1986, lon:77.7066, pop:13.2, tourism:0.55, fees:0.90, slots:0.70},
+    {id:"HYD", name:"Hyderabad", country:"India", lat:17.2403, lon:78.4294, pop:10.5, tourism:0.50, fees:0.88, slots:0.62},
+    {id:"MAA", name:"Chennai", country:"India", lat:12.9900, lon:80.1693, pop:11.2, tourism:0.57, fees:0.86, slots:0.62},
+    {id:"COK", name:"Kochi", country:"India", lat:10.1520, lon:76.4019, pop:2.1, tourism:0.70, fees:0.82, slots:0.48},
+    {id:"GOI", name:"Goa", country:"India", lat:15.3800, lon:73.8314, pop:1.6, tourism:0.86, fees:0.80, slots:0.50},
+    {id:"LHR", name:"London", country:"UK", lat:51.4700, lon:-0.4543, pop:9.0, tourism:0.85, fees:1.45, slots:0.95},
+    {id:"CDG", name:"Paris", country:"France", lat:49.0097, lon:2.5479, pop:11.2, tourism:0.88, fees:1.35, slots:0.88},
+    {id:"FRA", name:"Frankfurt", country:"Germany", lat:50.0379, lon:8.5622, pop:5.8, tourism:0.62, fees:1.28, slots:0.82},
+    {id:"IST", name:"Istanbul", country:"Turkey", lat:41.2753, lon:28.7519, pop:15.8, tourism:0.80, fees:1.05, slots:0.80},
+    {id:"SIN", name:"Singapore", country:"Singapore", lat:1.3644, lon:103.9915, pop:5.9, tourism:0.78, fees:1.22, slots:0.80},
+    {id:"BKK", name:"Bangkok", country:"Thailand", lat:13.6900, lon:100.7501, pop:10.5, tourism:0.86, fees:0.95, slots:0.78},
+    {id:"KUL", name:"Kuala Lumpur", country:"Malaysia", lat:2.7456, lon:101.7072, pop:8.4, tourism:0.74, fees:0.90, slots:0.70},
+    {id:"HKG", name:"Hong Kong", country:"China", lat:22.3080, lon:113.9185, pop:7.4, tourism:0.76, fees:1.30, slots:0.86},
+    {id:"NRT", name:"Tokyo", country:"Japan", lat:35.7720, lon:140.3929, pop:37.0, tourism:0.70, fees:1.42, slots:0.80},
+    {id:"JFK", name:"New York", country:"USA", lat:40.6413, lon:-73.7781, pop:19.8, tourism:0.80, fees:1.50, slots:0.88},
+  ];
+
+  const AIRCRAFT_MODELS = [
+    // model, category, seats, rangeKm, speedKmh, fuelLph, maintPerHour, price, leasePerDay, reliability, turnaroundMin
+    {model:"A320neo", cat:"Narrow", seats:180, range:6300, speed:830, fuelLph:2600, maintHr:520, price:58e6, leaseDay:78e3, rel:0.985, tat:45},
+    {model:"B737 MAX 8", cat:"Narrow", seats:178, range:6100, speed:835, fuelLph:2550, maintHr:530, price:57e6, leaseDay:77e3, rel:0.982, tat:45},
+    {model:"A220-300", cat:"Narrow", seats:145, range:6200, speed:820, fuelLph:2150, maintHr:470, price:46e6, leaseDay:62e3, rel:0.988, tat:40},
+    {model:"E195-E2", cat:"Regional", seats:132, range:4800, speed:805, fuelLph:1950, maintHr:440, price:38e6, leaseDay:52e3, rel:0.989, tat:38},
+    {model:"ATR 72-600", cat:"Turboprop", seats:72, range:1500, speed:510, fuelLph:720, maintHr:260, price:19e6, leaseDay:24e3, rel:0.992, tat:28},
+
+    {model:"A321XLR", cat:"Narrow+", seats:200, range:8700, speed:840, fuelLph:2850, maintHr:560, price:70e6, leaseDay:92e3, rel:0.980, tat:48},
+    {model:"A330-900", cat:"Wide", seats:300, range:13300, speed:880, fuelLph:6600, maintHr:1200, price:150e6, leaseDay:210e3, rel:0.975, tat:75},
+    {model:"B787-9", cat:"Wide", seats:290, range:14100, speed:900, fuelLph:6400, maintHr:1260, price:160e6, leaseDay:225e3, rel:0.978, tat:80},
+  ];
+
+  const STARTERS = [
+    { name:"Aurora Air", hub:"RUH", cash: 85e6, rep: 52, staff: 640, marketing: 0.06, salaryPerStaffDay: 42, fuelPricePerL: 0.78 },
+    { name:"Coastal Wings", hub:"COK", cash: 38e6, rep: 46, staff: 380, marketing: 0.04, salaryPerStaffDay: 34, fuelPricePerL: 0.70 },
+    { name:"Gulf Arrow", hub:"DMM", cash: 55e6, rep: 49, staff: 480, marketing: 0.05, salaryPerStaffDay: 38, fuelPricePerL: 0.76 },
+  ];
+
+  const RESEARCH = [
+    { id:"fuel1", name:"Fuel Optimization I", cost: 8e6, desc:"Reduce fuel burn by 3%.", apply:s=>{s.mods.fuel *= 0.97;} },
+    { id:"fuel2", name:"Fuel Optimization II", cost: 15e6, req:["fuel1"], desc:"Reduce fuel burn by 4% (stacking).", apply:s=>{s.mods.fuel *= 0.96;} },
+    { id:"reli1", name:"Reliability Program", cost: 10e6, desc:"Improve reliability +0.6% (fewer delays & cancellations).", apply:s=>{s.mods.rel += 0.006;} },
+    { id:"tat1", name:"Turnaround Excellence", cost: 7e6, desc:"Improve turnaround -8% (better utilization).", apply:s=>{s.mods.tat *= 0.92;} },
+    { id:"mkt1", name:"Brand Refresh", cost: 6e6, desc:"Marketing efficiency +12%.", apply:s=>{s.mods.mkt *= 1.12;} },
+    { id:"svc1", name:"Cabin Service Upgrade", cost: 9e6, desc:"Reputation +3 and yield +1.5%.", apply:s=>{s.rep = clamp(s.rep+3,0,100); s.mods.yield *= 1.015;} },
+    { id:"it1", name:"Ops IT Automation", cost: 12e6, desc:"Lower salary overhead -3% and fewer disruptions.", apply:s=>{s.mods.salary *= 0.97; s.mods.disrupt *= 0.93;} },
+  ];
+
+  const WORLD_EVENTS = [
+    { w: 10, name:"Calm Markets", tag:"good", headline:"Markets stable. Travel demand normal.",
+      effect:s=>{ s.world.oilShock=0; s.world.demandMul = lerp(s.world.demandMul,1.00,0.35); } },
+    { w: 6, name:"Tourism Boom", tag:"good", headline:"A regional tourism campaign boosts leisure travel.",
+      effect:s=>{ s.world.demandMul*=1.06; s.rep=clamp(s.rep+1,0,100); } },
+    { w: 5, name:"Business Season", tag:"good", headline:"Business travel rises on major corridors.",
+      effect:s=>{ s.world.bizMul*=1.08; } },
+    { w: 5, name:"Oil Price Spike", tag:"warn", headline:"Oil spikes after geopolitical tensions. Fuel gets expensive.",
+      effect:s=>{ s.world.oilShock=1; s.fuelPricePerL*=1.10; } },
+    { w: 4, name:"Storm Front", tag:"warn", headline:"Widespread storms disrupt schedules. Expect delays.",
+      effect:s=>{ s.world.disruptMul*=1.18; } },
+    { w: 3, name:"Runway Works", tag:"warn", headline:"Temporary runway works at a busy airport increases slot pressure.",
+      effect:s=>{ s.world.slotMul*=1.12; } },
+    { w: 3, name:"Currency Weakness", tag:"warn", headline:"Currency weakness reduces discretionary spending.",
+      effect:s=>{ s.world.demandMul*=0.96; } },
+    { w: 2, name:"Safety Incident (Industry)", tag:"bad", headline:"Industry incident shakes confidence. Demand dips briefly.",
+      effect:s=>{ s.world.demandMul*=0.94; s.rep=clamp(s.rep-1,0,100);} },
+    { w: 2, name:"Crew Shortage", tag:"bad", headline:"Pilot & crew shortage pushes wages upward.",
+      effect:s=>{ s.salaryPerStaffDay*=1.06; } },
+  ];
+
+  function weightedPick(items){
+    const sum = items.reduce((a,x)=>a+x.w,0);
+    let r = Math.random()*sum;
+    for(const it of items){ r -= it.w; if(r<=0) return it; }
+    return items[items.length-1];
+  }
+
+  /**********************
+   * Game state
+   **********************/
+  const SAVE_KEY = "airline_tycoon_save_v1";
+  const AUTOSAVE_EVERY_DAYS = 3;
+
+  const State = {
+    s: null,
+    autoTimer: null,
+    tab: "overview",
+  };
+
+  function newGame(starterIndex=0){
+    const st = deepCopy(STARTERS[starterIndex]);
+    const s = {
+      version: 1,
+      createdAt: nowISO(),
+      day: 1,
+      company: st.name,
+      hub: st.hub,
+      cash: st.cash,
+      rep: st.rep,
+      staff: st.staff,
+      marketing: st.marketing,
+      salaryPerStaffDay: st.salaryPerStaffDay,
+      fuelPricePerL: st.fuelPricePerL,
+      loans: [], // {id, principal, rateAPR, daysLeft, paymentPerDay}
+      mods: { fuel:1.0, rel:0.0, tat:1.0, mkt:1.0, yield:1.0, salary:1.0, disrupt:1.0 },
+      world: { demandMul:1.0, bizMul:1.0, disruptMul:1.0, slotMul:1.0, oilShock:0 },
+      fleet: [],  // aircraft objects
+      routes: [], // routes
+      research: { unlocked: [] },
+      history: { cash: [], profit: [], pax: [], lf: [], rep: [] },
+      log: [],
+      lastHeadline: "No major disruptions. Markets steady."
+    };
+
+    // starter fleet: 2-3 aircraft leased based on starter wealth
+    const hub = airportById(s.hub);
+    const starterModels = (starterIndex===1)
+      ? ["ATR 72-600","E195-E2","A220-300"]
+      : (starterIndex===2)
+        ? ["A320neo","B737 MAX 8","A220-300"]
+        : ["A320neo","A220-300","B737 MAX 8"];
+
+    const n = starterIndex===0 ? 3 : 2;
+    for(let i=0;i<n;i++){
+      const m = aircraftModelByName(pick(starterModels));
+      s.fleet.push(makeAircraft(m, true));
+    }
+
+    // starter routes: 2
+    const near = airportsByDistanceFrom(hub.id).filter(x=>x.km<2200).slice(0,6);
+    const pick2 = [near[0], near[2] || near[1]].filter(Boolean);
+    for(const dest of pick2){
+      const ac = s.fleet.find(a=>a.status==="IDLE") || s.fleet[0];
+      const price = suggestPrice(hub.id, dest.id, ac.model);
+      s.routes.push(makeRoute(hub.id, dest.id, ac.id, 1, price, "Balanced"));
+      ac.status="ASSIGNED";
+      ac.routeId = s.routes[s.routes.length-1].id;
+    }
+
+    addLog(s, "info", "Welcome aboard", `You are CEO of <b>${escapeHtml(s.company)}</b>. Your hub is <b>${hub.id}</b> (${hub.name}). Start by expanding routes and keeping costs under control.`);
+    addLog(s, "tip", "Quick win", `Try adding a <b>short-haul</b> route first. Keep ticket prices near the suggested level, then tweak frequency and aircraft assignment for a > <b>80%</b> load factor.`);
+    State.s = s;
+    State.tab = "overview";
+    stopAuto();
+    renderAll();
+    autosave();
+  }
+
+  function makeAircraft(model, leased=false){
+    const id = "AC-"+uid().slice(0,8).toUpperCase();
+    const ageDays = rndi(30, 420);
+    const condition = clamp(1.0 - ageDays/2500 + rnd(.04,-.04), 0.68, 0.98);
+    return {
+      id,
+      model: model.model,
+      cat: model.cat,
+      seats: model.seats,
+      range: model.range,
+      speed: model.speed,
+      fuelLph: model.fuelLph,
+      maintHr: model.maintHr,
+      purchasePrice: model.price,
+      leaseDay: model.leaseDay,
+      reliability: model.rel,
+      tat: model.tat,
+      ageDays,
+      cycles: rndi(80, 400),
+      hours: rndi(150, 1100),
+      condition,          // 0..1
+      nextCheckInDays: rndi(10, 32), // soft maintenance interval
+      status: "IDLE",     // IDLE / ASSIGNED / MAINT
+      routeId: null,
+      leased,
+      notes: leased ? "Operating lease" : "Owned"
+    };
+  }
+
+  function makeRoute(aId, bId, aircraftId, freqPerDay, price, strategy){
+    const id = "R-"+uid().slice(0,8).toUpperCase();
+    return {
+      id,
+      from: aId,
+      to: bId,
+      aircraftId,
+      freq: clamp(freqPerDay, 0.1, 8),
+      price: clamp(price, 40, 1500),
+      strategy: strategy || "Balanced", // LowCost / Balanced / Premium
+      active: true,
+      last: { pax:0, lf:0, profit:0, cancels:0, delays:0 }
+    };
+  }
+
+  function airportById(id){ return AIRPORTS.find(a=>a.id===id); }
+  function aircraftModelByName(name){ return AIRCRAFT_MODELS.find(m=>m.model===name); }
+  function aircraftById(s,id){ return s.fleet.find(a=>a.id===id); }
+  function routeById(s,id){ return s.routes.find(r=>r.id===id); }
+
+  function airportsByDistanceFrom(hubId){
+    const hub = airportById(hubId);
+    const arr = AIRPORTS.filter(a=>a.id!==hubId).map(a=>({ ...a, km: distKm(hub,a) }));
+    arr.sort((x,y)=>x.km-y.km);
+    return arr;
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  /**********************
+   * Economics / Simulation
+   **********************/
+  function suggestPrice(fromId,toId, modelName){
+    const a=airportById(fromId), b=airportById(toId);
+    const km = distKm(a,b);
+    const basePerKm = 0.075; // typical economy yield-ish baseline
+    const m = aircraftModelByName(modelName);
+    const comfort = (m.cat==="Wide") ? 1.12 : (m.cat==="Narrow+") ? 1.06 : (m.cat==="Regional") ? 1.02 : 0.98;
+    const fee = (a.fees + b.fees)/2;
+    const tourism = (a.tourism + b.tourism)/2;
+    const demand = (a.pop + b.pop)/12 + tourism*2.2;
+    const price = km*basePerKm*comfort*fee*(1.0 + 0.08*Math.log1p(demand));
+    return clamp(price, 55, 980);
+  }
+
+  function routeDemandBase(fromId,toId){
+    const a=airportById(fromId), b=airportById(toId);
+    const km = distKm(a,b);
+    // base demand increases with pop, tourism, and medium distances; penalize very long routes
+    const pop = Math.sqrt(a.pop*b.pop);
+    const tour = (a.tourism + b.tourism)/2;
+    const hubBonus = (fromId===State.s.hub || toId===State.s.hub) ? 1.06 : 1.0;
+    const distShape = Math.exp(-Math.pow((km-1800)/2600,2)*0.45) + 0.35; // bell-ish
+    const base = (pop*520 + tour*380) * distShape * hubBonus;
+    // scale down to daily pax per frequency
+    return base / 22;
+  }
+
+  // Elasticities by strategy
+  function elasticity(strategy){
+    if(strategy==="LowCost") return {price: -1.35, biz: 0.65, yield: 0.92, rep: 0.75};
+    if(strategy==="Premium") return {price: -0.75, biz: 1.20, yield: 1.12, rep: 1.10};
+    return {price: -1.05, biz: 1.00, yield: 1.00, rep: 0.95};
+  }
+
+  function simulateDay(s){
+    // 1) Possibly world event
+    if(s.day===1 || Math.random()<0.35){
+      const ev = weightedPick(WORLD_EVENTS);
+      const beforeFuel=s.fuelPricePerL;
+      const beforeDemand=s.world.demandMul;
+      const beforeDis=s.world.disruptMul;
+      ev.effect(s);
+
+      // mean revert some world multipliers
+      s.world.bizMul = lerp(s.world.bizMul, 1.00, 0.15);
+      s.world.disruptMul = lerp(s.world.disruptMul, 1.00, 0.12);
+      s.world.slotMul = lerp(s.world.slotMul, 1.00, 0.10);
+
+      s.lastHeadline = ev.headline;
+      addLog(s, ev.tag, ev.name, `${ev.headline} <span class="tiny">(Fuel ${fmt(beforeFuel,2)}→${fmt(s.fuelPricePerL,2)} / Demand× ${fmt(beforeDemand,2)}→${fmt(s.world.demandMul,2)} / Disrupt× ${fmt(beforeDis,2)}→${fmt(s.world.disruptMul,2)})</span>`);
+    } else {
+      // gentle mean reversion
+      s.world.demandMul = lerp(s.world.demandMul, 1.00, 0.10);
+      s.world.bizMul = lerp(s.world.bizMul, 1.00, 0.10);
+      s.world.disruptMul = lerp(s.world.disruptMul, 1.00, 0.10);
+      s.world.slotMul = lerp(s.world.slotMul, 1.00, 0.10);
+      s.fuelPricePerL = lerp(s.fuelPricePerL, 0.75, 0.04);
+    }
+
+    // 2) Pay staff salaries (overhead)
+    const salaryDaily = s.staff * s.salaryPerStaffDay * s.mods.salary;
+    s.cash -= salaryDaily;
+
+    // 3) Lease payments
+    let leaseCost=0;
+    for(const ac of s.fleet){
+      if(ac.leased) leaseCost += ac.leaseDay;
+    }
+    s.cash -= leaseCost;
+
+    // 4) Loans payments
+    let loanCost=0;
+    for(const loan of s.loans){
+      loan.daysLeft--;
+      s.cash -= loan.paymentPerDay;
+      loanCost += loan.paymentPerDay;
+    }
+    s.loans = s.loans.filter(l=>l.daysLeft>0);
+
+    // 5) Operate routes
+    let totalPax=0, totalSeats=0, totalProfit=0, cancels=0, delays=0;
+    const hub = airportById(s.hub);
+
+    for(const r of s.routes){
+      if(!r.active) continue;
+      const ac = aircraftById(s, r.aircraftId);
+      if(!ac || ac.status==="MAINT"){ r.last={pax:0, lf:0, profit:0, cancels:0, delays:0}; continue; }
+
+      const A=airportById(r.from), B=airportById(r.to);
+      const km = distKm(A,B);
+
+      // Check feasibility
+      if(km > ac.range*0.97){
+        r.last={pax:0, lf:0, profit:-12000, cancels: r.freq, delays:0};
+        s.cash -= 12000; // penalties
+        s.rep = clamp(s.rep - 0.25, 0, 100);
+        addLog(s, "bad", "Range issue", `Route <b>${A.id}–${B.id}</b> exceeded <b>${ac.model}</b> range. Flights cancelled. Assign a longer-range aircraft or close route.`);
+        cancels += r.freq;
+        continue;
+      }
+
+      // Utilization constraint based on turnaround + block time
+      const blockHours = (km/ac.speed)*1.12 + 0.35; // cruise + taxi/hold
+      const tatH = (ac.tat * s.mods.tat)/60;
+      const flightPairHours = (blockHours + tatH) * 2; // round trip
+      const maxPairs = clamp( Math.floor(12 / flightPairHours) + 0.6, 0.6, 6.5 );
+      const pairs = clamp(r.freq, 0, maxPairs);
+
+      // Demand & price response
+      const base = routeDemandBase(r.from,r.to);
+      const e = elasticity(r.strategy);
+
+      const compPrice = suggestPrice(r.from,r.to, ac.model); // pseudo market fare
+      const priceRatio = r.price / compPrice;
+      const priceEffect = Math.pow(clamp(priceRatio, 0.55, 1.75), e.price);
+
+      // Reputation & marketing influence
+      const repEffect = 0.75 + (s.rep/100) * e.rep;
+      const marketingEffect = 1.0 + (s.marketing * s.mods.mkt) * 0.65;
+
+      // Business / leisure mix: long + big-city gets more business
+      const big = (A.pop+B.pop)/2;
+      const long = clamp(km/6000, 0, 1);
+      const bizShare = clamp(0.22 + 0.12*Math.log1p(big) + 0.16*long, 0.18, 0.55);
+      const bizEffect = lerp(1.0, s.world.bizMul, bizShare * e.biz);
+
+      // Slot pressure reduces achievable throughput (delays/caps)
+      const slotPressure = ((A.slots+B.slots)/2) * s.world.slotMul;
+      const slotCap = clamp(1.0 - (slotPressure-0.5)*0.22, 0.78, 1.0);
+
+      const demand = base * pairs * s.world.demandMul * priceEffect * repEffect * marketingEffect * bizEffect * slotCap;
+
+      // Seats offered
+      const seats = Math.round(ac.seats * pairs * 2); // assume both directions count for pax demand
+      const pax = Math.round(clamp(demand, 0, seats));
+      const lf = seats>0 ? pax/seats : 0;
+
+      // Disruptions: delay/cancel probabilities depend on condition/reliability/world
+      const rel = clamp(ac.reliability + s.mods.rel - (1-ac.condition)*0.12, 0.86, 0.995);
+      const disrupt = s.world.disruptMul * s.mods.disrupt;
+      const cancelProb = clamp((1-rel)*0.65*disrupt + (1-ac.condition)*0.08, 0.002, 0.08);
+      const delayProb  = clamp((1-rel)*2.10*disrupt + (1-ac.condition)*0.18 + slotPressure*0.10, 0.02, 0.35);
+
+      const canc = Math.random() < cancelProb ? 1 : 0; // simplistic (one disruption event)
+      const del  = Math.random() < delayProb  ? rndi(1, Math.ceil(pairs)) : 0;
+
+      // Revenue: base fare with yield modifier (premium yields higher)
+      const yieldMul = s.mods.yield * (r.strategy==="Premium" ? 1.12 : r.strategy==="LowCost" ? 0.92 : 1.0);
+      const revenue = pax * r.price * yieldMul;
+
+      // Costs:
+      // Fuel
+      const hours = blockHours * pairs * 2;
+      const fuelL = ac.fuelLph * s.mods.fuel * hours;
+      const fuelCost = fuelL * s.fuelPricePerL;
+
+      // Airport fees: per pax + per flight
+      const feeIndex = (A.fees+B.fees)/2;
+      const flights = pairs * 2;
+      const airportFees = (pax*7.5 + flights*420) * feeIndex;
+
+      // Maintenance variable: per hour, rises with age/condition
+      const maint = ac.maintHr * hours * (1 + ac.ageDays/2600) * (1 + (1-ac.condition)*1.25);
+
+      // Catering/service: per pax
+      const service = pax * (r.strategy==="Premium" ? 8.5 : r.strategy==="LowCost" ? 3.2 : 5.0);
+
+      // Compensation for delays/cancellations
+      const comp = del * pax * 0.09 * r.price + canc * pax * 0.12 * r.price;
+
+      // Profit
+      let profit = revenue - (fuelCost + airportFees + maint + service + comp);
+
+      // Penalty if very low load factor (pricing wrong / overcapacity): wasted costs
+      if(lf < 0.55) profit -= (0.55-lf) * seats * 6.0;
+
+      // Apply cancel effect
+      if(canc){
+        const lostRevenue = revenue * (0.35 + 0.35*(1-lf));
+        profit -= lostRevenue;
+        cancels += 1;
+        s.rep = clamp(s.rep - 0.35, 0, 100);
+      }
+      if(del>0){
+        delays += del;
+        s.rep = clamp(s.rep - 0.10*del, 0, 100);
+      }
+
+      // Update aircraft wear
+      const wear = (hours/18)*0.018 + (ac.cycles/7000)*0.0002 + (1-rel)*0.010;
+      ac.condition = clamp(ac.condition - wear, 0.25, 1.0);
+      ac.hours += hours;
+      ac.cycles += flights;
+      ac.ageDays += 1;
+      ac.nextCheckInDays -= 1;
+
+      // Soft maintenance trigger
+      if(ac.nextCheckInDays <= 0){
+        const risk = (1-ac.condition) + (ac.ageDays/3500)*0.22;
+        const baseDowntime = rndi(1,3);
+        if(risk > 0.55 && Math.random() < clamp(risk,0.15,0.85)){
+          // forced maintenance soon
+          ac.status="MAINT";
+          ac.maintDaysLeft = baseDowntime + (risk>0.75?2:0);
+          addLog(s, "warn", "Maintenance scheduled", `<b>${ac.id}</b> (${ac.model}) is due for checks. It will be grounded for <b>${ac.maintDaysLeft}</b> day(s).`);
+        }
+        ac.nextCheckInDays = rndi(12, 30);
+      }
+
+      // Commit route results
+      s.cash += profit;
+      totalPax += pax;
+      totalSeats += seats;
+      totalProfit += profit;
+
+      r.last = { pax, lf, profit, cancels:canc, delays:del };
+
+      // Advisor nudges (rare)
+      if(s.day%9===0 && Math.random()<0.25){
+        if(lf>0.88 && profit>0){
+          addLog(s, "good", "Capacity tight", `Route <b>${A.id}–${B.id}</b> is running hot (LF ${pct(lf,0)}). Consider <b>+frequency</b> or a bigger aircraft.`);
+        } else if(lf<0.62){
+          addLog(s, "warn", "Soft demand", `Route <b>${A.id}–${B.id}</b> load factor is weak (LF ${pct(lf,0)}). Try <b>lower price</b>, reduce frequency, or switch aircraft.`);
+        }
+      }
+    }
+
+    // 6) Handle maintenance countdown
+    for(const ac of s.fleet){
+      if(ac.status==="MAINT"){
+        ac.maintDaysLeft--;
+        // maintenance cost depends on condition/age
+        const base = 85e3 + (1-ac.condition)*240e3 + (ac.ageDays/2200)*65e3;
+        s.cash -= base;
+        if(ac.maintDaysLeft<=0){
+          ac.status = ac.routeId ? "ASSIGNED" : "IDLE";
+          // restore condition
+          ac.condition = clamp(ac.condition + 0.18 + rnd(.03,-.03), 0.55, 0.99);
+          addLog(s, "good", "Aircraft returned", `<b>${ac.id}</b> is back in service. Condition improved.`);
+        }
+      }
+    }
+
+    // 7) Reputation drift: good operations slowly lift rep; bad cashflow harms rep
+    const lfAll = totalSeats>0 ? (totalPax/totalSeats) : 0;
+    const opScore = (lfAll-0.62)*18 + (totalProfit>0?1:-1) - cancels*0.8 - delays*0.12;
+    s.rep = clamp(s.rep + clamp(opScore, -1.2, 1.1)*0.18, 0, 100);
+
+    // 8) Marketing budget (simple): spend % of revenue target (or set by slider)
+    // We'll model marketing as fixed fraction of max(0, cashflow base) to keep it from exploding.
+    const mSpend = clamp(s.marketing, 0, 0.18) * Math.max(0, (totalPax*120)); // proxy
+    s.cash -= mSpend;
+
+    // 9) Bankruptcy warning
+    if(s.cash < -25e6){
+      addLog(s, "bad", "Liquidity crisis", `Cash is critically low (${fmtMoney(s.cash)}). Consider taking a loan, selling aircraft, lowering frequency, or raising fares (carefully).`);
+    }
+
+    // 10) Record history
+    const profitNet = totalProfit - salaryDaily - leaseCost - loanCost - mSpend;
+    s.history.cash.push(s.cash);
+    s.history.profit.push(profitNet);
+    s.history.pax.push(totalPax);
+    s.history.lf.push(lfAll);
+    s.history.rep.push(s.rep);
+    trimHistory(s);
+
+    // 11) Small headline + maintenance hint updates
+    s.lastHeadline = s.lastHeadline || "No major disruptions. Markets steady.";
+    updateMaintHint(s);
+
+    // Advance day
+    s.day++;
+
+    if((s.day % AUTOSAVE_EVERY_DAYS)===0) autosave();
+
+    return { totalPax, totalSeats, lfAll, profitNet, cancels, delays, salaryDaily, leaseCost, loanCost, mSpend };
+  }
+
+  function trimHistory(s){
+    const cap=120; // last ~120 days
+    for(const k of Object.keys(s.history)){
+      if(s.history[k].length>cap) s.history[k]=s.history[k].slice(-cap);
+    }
+    if(s.log.length>120) s.log = s.log.slice(-120);
+  }
+
+  function updateMaintHint(s){
+    let worst=null;
+    for(const ac of s.fleet){
+      const risk = (1-ac.condition)*0.9 + (ac.ageDays/3500)*0.35 + (ac.status==="MAINT"?0.25:0);
+      if(!worst || risk>worst.risk) worst={ac, risk};
+    }
+    if(!worst){ $("#maintHint").textContent="No aircraft yet."; return; }
+    const a=worst.ac;
+    const r=worst.risk;
+    const msg =
+      r>0.85 ? `High risk: ${a.id} (${a.model}) condition is low. Schedule maintenance or reduce utilization.`
+      : r>0.65 ? `Watch: ${a.id} (${a.model}) is aging/low condition. Consider a check soon.`
+      : `Your fleet looks healthy. Highest risk aircraft: ${a.id} (${a.model}).`;
+    $("#maintHint").textContent = msg;
+  }
+
+  /**********************
+   * Actions
+   **********************/
+  function buyAircraft(s, modelName, mode){
+    const m = aircraftModelByName(modelName);
+    if(!m) return;
+    if(mode==="BUY"){
+      const down = m.price;
+      if(s.cash < down){ toastWarn(`Not enough cash to buy ${m.model}. Need ${fmtMoney(down)}.`); return; }
+      s.cash -= down;
+      const ac = makeAircraft(m, false);
+      ac.ageDays = 0;
+      ac.condition = 0.98;
+      ac.hours = 0;
+      ac.cycles = 0;
+      addLog(s, "good", "Fleet expanded", `Purchased <b>${ac.model}</b> (${ac.id}) for <b>${fmtMoney(down)}</b>.`);
+      s.fleet.push(ac);
+    } else {
+      // lease
+      const deposit = m.leaseDay * 12;
+      if(s.cash < deposit){ toastWarn(`Not enough cash for lease deposit. Need ${fmtMoney(deposit)}.`); return; }
+      s.cash -= deposit;
+      const ac = makeAircraft(m, true);
+      ac.ageDays = rndi(90, 750);
+      ac.condition = clamp(0.88 - ac.ageDays/4000 + rnd(.04,-.04), 0.62, 0.92);
+      addLog(s, "info", "Lease started", `Leased <b>${ac.model}</b> (${ac.id}). Deposit <b>${fmtMoney(deposit)}</b>, daily lease <b>${fmtMoney(m.leaseDay)}</b>.`);
+      s.fleet.push(ac);
+    }
+  }
+
+  function sellAircraft(s, aircraftId){
+    const ac = aircraftById(s, aircraftId);
+    if(!ac) return;
+    if(ac.leased){
+      // early termination fee
+      const fee = ac.leaseDay * 35;
+      if(s.cash < fee){ toastWarn(`Terminating lease costs ${fmtMoney(fee)}. Not enough cash.`); return; }
+      if(ac.routeId){
+        const r = routeById(s, ac.routeId);
+        if(r){ r.aircraftId=null; r.active=false; }
+      }
+      s.cash -= fee;
+      s.fleet = s.fleet.filter(x=>x.id!==aircraftId);
+      addLog(s, "warn", "Lease terminated", `Ended lease for <b>${ac.id}</b> (${ac.model}). Fee <b>${fmtMoney(fee)}</b>.`);
+      return;
+    }
+    // owned aircraft sale: depreciated by age & condition
+    const m = aircraftModelByName(ac.model);
+    const dep = clamp(1 - ac.ageDays/5000, 0.28, 0.98);
+    const val = m.price * dep * (0.62 + ac.condition*0.50);
+    if(ac.routeId){
+      const r = routeById(s, ac.routeId);
+      if(r){ r.aircraftId=null; r.active=false; }
+    }
+    s.cash += val;
+    s.fleet = s.fleet.filter(x=>x.id!==aircraftId);
+    addLog(s, "info", "Aircraft sold", `Sold <b>${ac.id}</b> (${ac.model}) for <b>${fmtMoney(val)}</b>.`);
+  }
+
+  function addRoute(s, fromId, toId, aircraftId, freq, price, strategy){
+    if(fromId===toId){ toastWarn("Choose two different airports."); return; }
+    const a=airportById(fromId), b=airportById(toId);
+    if(!a||!b){ toastWarn("Invalid airports."); return; }
+    const ac = aircraftById(s, aircraftId);
+    if(!ac){ toastWarn("Select an aircraft."); return; }
+    if(ac.status==="MAINT"){ toastWarn("Aircraft is in maintenance."); return; }
+    const km = distKm(a,b);
+    if(km > ac.range*0.97){ toastWarn("Route too long for this aircraft."); return; }
+
+    // if aircraft already assigned, unassign prior route
+    if(ac.routeId){
+      const old = routeById(s, ac.routeId);
+      if(old){ old.aircraftId=null; old.active=false; }
+    }
+
+    const r = makeRoute(fromId,toId, aircraftId, freq, price, strategy);
+    s.routes.push(r);
+    ac.status="ASSIGNED";
+    ac.routeId=r.id;
+    addLog(s, "good", "Route launched", `Opened <b>${fromId}–${toId}</b> with <b>${ac.model}</b>. Frequency <b>${fmt(freq,1)}</b>/day, fare <b>$${fmt(price,0)}</b>, strategy <b>${strategy}</b>.`);
+  }
+
+  function closeRoute(s, routeId){
+    const r = routeById(s, routeId);
+    if(!r) return;
+    r.active=false;
+    const ac = r.aircraftId ? aircraftById(s, r.aircraftId) : null;
+    if(ac && ac.routeId===r.id){
+      ac.routeId=null;
+      ac.status="IDLE";
+    }
+    addLog(s, "warn", "Route closed", `Closed route <b>${r.from}–${r.to}</b>.`);
+  }
+
+  function setRouteAircraft(s, routeId, aircraftId){
+    const r = routeById(s, routeId);
+    const ac = aircraftById(s, aircraftId);
+    if(!r || !ac) return;
+    if(ac.status==="MAINT"){ toastWarn("That aircraft is in maintenance."); return; }
+    const A=airportById(r.from), B=airportById(r.to);
+    const km = distKm(A,B);
+    if(km > ac.range*0.97){ toastWarn("Route too long for this aircraft."); return; }
+
+    // free previous aircraft
+    if(r.aircraftId){
+      const prev = aircraftById(s, r.aircraftId);
+      if(prev && prev.routeId===r.id){ prev.routeId=null; prev.status="IDLE"; }
+    }
+    // if this aircraft had a route, close it
+    if(ac.routeId){
+      const old = routeById(s, ac.routeId);
+      if(old){ old.active=false; old.aircraftId=null; }
+    }
+
+    r.aircraftId = aircraftId;
+    ac.routeId = r.id;
+    ac.status = "ASSIGNED";
+    addLog(s, "info", "Aircraft reassigned", `Assigned <b>${ac.id}</b> (${ac.model}) to <b>${r.from}–${r.to}</b>.`);
+  }
+
+  function scheduleCheck(s, aircraftId, days=2){
+    const ac=aircraftById(s, aircraftId);
+    if(!ac) return;
+    if(ac.status==="MAINT"){ toastWarn("Already in maintenance."); return; }
+    ac.status="MAINT";
+    ac.maintDaysLeft = clamp(days,1,6);
+    addLog(s, "warn", "Manual maintenance", `You grounded <b>${ac.id}</b> for <b>${ac.maintDaysLeft}</b> day(s). This reduces disruption risk but costs money.`);
+  }
+
+  function hireStaff(s, n){
+    n = Math.floor(n);
+    if(!Number.isFinite(n) || n===0) return;
+    if(n>0){
+      const hiringCost = n*180; // recruiting/admin
+      s.cash -= hiringCost;
+      s.staff += n;
+      addLog(s, "info", "Hiring", `Hired <b>${n}</b> staff. One-time recruiting cost <b>${fmtMoney(hiringCost)}</b>.`);
+    } else {
+      const fire = Math.min(s.staff, Math.abs(n));
+      const severance = fire * s.salaryPerStaffDay * 6;
+      s.cash -= severance;
+      s.staff -= fire;
+      s.rep = clamp(s.rep - fire/1200, 0, 100);
+      addLog(s, "warn", "Layoffs", `Reduced headcount by <b>${fire}</b>. Severance <b>${fmtMoney(severance)}</b>. Reputation slightly reduced.`);
+    }
+  }
+
+  function takeLoan(s, principal, rateAPR, days){
+    principal = Math.floor(principal);
+    days = Math.floor(days);
+    if(principal<=0 || days<=0) return;
+    // simple amortization: equal daily payment (principal + interest)
+    const rDaily = (rateAPR/100)/365;
+    const total = principal * (1 + rDaily*days);
+    const pay = total / days;
+
+    s.cash += principal;
+    s.loans.push({
+      id:"L-"+uid().slice(0,8).toUpperCase(),
+      principal,
+      rateAPR,
+      daysLeft: days,
+      paymentPerDay: pay
+    });
+    addLog(s, "warn", "Loan taken", `Borrowed <b>${fmtMoney(principal)}</b> at <b>${rateAPR}% APR</b> for <b>${days}</b> days. Daily payment <b>${fmtMoney(pay)}</b>.`);
+  }
+
+  function repayLoan(s, loanId){
+    const idx = s.loans.findIndex(l=>l.id===loanId);
+    if(idx<0) return;
+    const l = s.loans[idx];
+    // pay remaining balance approximated
+    const remaining = l.paymentPerDay * l.daysLeft;
+    if(s.cash < remaining){ toastWarn(`Need ${fmtMoney(remaining)} to repay in full.`); return; }
+    s.cash -= remaining;
+    s.loans.splice(idx,1);
+    addLog(s, "good", "Loan repaid", `Repaid <b>${loanId}</b> in full for <b>${fmtMoney(remaining)}</b>.`);
+  }
+
+  function unlockResearch(s, id){
+    if(s.research.unlocked.includes(id)) return;
+    const r = RESEARCH.find(x=>x.id===id);
+    if(!r) return;
+    const reqOK = (r.req||[]).every(x=>s.research.unlocked.includes(x));
+    if(!reqOK){ toastWarn("Prerequisite not met."); return; }
+    if(s.cash < r.cost){ toastWarn(`Need ${fmtMoney(r.cost)} for research.`); return; }
+    s.cash -= r.cost;
+    s.research.unlocked.push(id);
+    r.apply(s);
+    addLog(s, "good", "Research complete", `Unlocked <b>${r.name}</b> for <b>${fmtMoney(r.cost)}</b>. ${r.desc}`);
+  }
+
+  /**********************
+   * Log + Notifications
+   **********************/
+  function addLog(s, tag, title, msg){
+    const t = (tag==="good")?"good":(tag==="warn")?"warn":(tag==="bad")?"bad":"";
+    const item = { id:uid(), day:s.day, tag, title, msg, at: nowISO() };
+    s.log.push(item);
+    if(s.log.length>140) s.log = s.log.slice(-140);
+  }
+
+  function toastWarn(text){
+    $("#alertBox").style.display="block";
+    $("#alertBox").innerHTML = `<b>Notice:</b> ${escapeHtml(text)}`;
+    setTimeout(()=>{ $("#alertBox").style.display="none"; }, 3400);
+  }
+
+  /**********************
+   * Save / Load
+   **********************/
+  function autosave(){
+    try{
+      localStorage.setItem(SAVE_KEY, JSON.stringify(State.s));
+      $("#simState").textContent = "SAVED";
+      setTimeout(()=>$("#simState").textContent = isAutoRunning() ? "AUTO" : "PAUSED", 700);
+    }catch(e){
+      toastWarn("Autosave failed (storage full?). Try Export instead.");
+    }
+  }
+
+  function loadFromStorage(){
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw){ toastWarn("No save found."); return; }
+    try{
+      const s = JSON.parse(raw);
+      State.s = s;
+      stopAuto();
+      addLog(s,"info","Save loaded","Loaded from browser storage.");
+      renderAll();
+    }catch(e){
+      toastWarn("Save data corrupted.");
+    }
+  }
+
+  function exportJSON(){
+    const data = JSON.stringify(State.s, null, 2);
+    openModal("Export Save", "Copy the JSON below and store it somewhere safe.", `
+      <div class="hint">Tip: You can import this later even on another device.</div>
+      <div class="sep"></div>
+      <textarea style="width:100%; min-height:360px" class="mono" spellcheck="false">${escapeHtml(data)}</textarea>
+    `);
+  }
+
+  function importJSON(){
+    openModal("Import Save", "Paste your JSON and click Import.", `
+      <div class="hint">This replaces your current game.</div>
+      <div class="sep"></div>
+      <textarea id="importBox" style="width:100%; min-height:320px" class="mono
